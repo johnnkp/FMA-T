@@ -1,18 +1,18 @@
 from tensorflow.keras.layers import (
-    Input,
-    GlobalAvgPool1D,
-    Dense,
     Bidirectional,
-    GRU,
+    Dense,
     Dropout,
+    GlobalAvgPool1D,
+    GRU,
+    Input,
 )
+from tensorflow.keras.losses import mae
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework import ops
 from tensorflow.python.keras import backend as K
 from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import math_ops
-from tensorflow.keras.losses import mae
 
 from transformer import Encoder
 
@@ -53,16 +53,16 @@ def transformer_classifier(
         num_heads=num_heads,
         dff=dff,
         maximum_position_encoding=maximum_position_encoding,
-        rate=0.3,
+        # rate=0.3,
     )
 
     x = encoder(inp)
 
-    x = Dropout(0.2)(x)
-
     x = GlobalAvgPool1D()(x)
 
     x = Dense(4 * n_classes, activation="selu")(x)
+
+    x = Dropout(0.1)(x)
 
     out = Dense(n_classes, activation="sigmoid")(x)
 
@@ -71,7 +71,7 @@ def transformer_classifier(
     opt = Adam(0.00001)
 
     model.compile(
-        optimizer=opt, loss=custom_binary_crossentropy, metrics=[custom_binary_accuracy]
+        optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']
     )
 
     model.summary()
