@@ -1,5 +1,6 @@
 import json
 from glob import glob
+import os
 
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
@@ -12,11 +13,11 @@ if __name__ == "__main__":
 
     h5_name = "transformer_pretrain.h5"
     batch_size = 32
-    epochs = 100
-    id_to_genres = json.load(open("/media/ml/data_ml/fma_metadata/tracks_genre.json"))
+    epochs = 20
+    id_to_genres = json.load(open("data/fma_metadata/tracks_genre.json"))
     id_to_genres = {int(k): v for k, v in id_to_genres.items()}
 
-    base_path = "/media/ml/data_ml/fma_large"
+    base_path = os.path.join(os.getcwd(), 'data', os.listdir('data')[1], 'fma_large')
     files = sorted(list(glob(base_path + "/*/*.npy")))
     files = [x for x in files if id_to_genres[int(get_id_from_path(x))]]
     labels = [id_to_genres[int(get_id_from_path(x))] for x in files]
@@ -62,8 +63,5 @@ if __name__ == "__main__":
         validation_data=PretrainGenerator(val, batch_size=batch_size),
         epochs=epochs,
         callbacks=[checkpoint, reduce_o_p],
-        use_multiprocessing=True,
-        workers=12,
-        verbose=2,
         max_queue_size=64,
     )
