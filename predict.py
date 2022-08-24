@@ -16,10 +16,10 @@ if __name__ == "__main__":
 
     transformer_v2_h5 = "transformer_v2.h5"
 
-    CLASS_MAPPING = json.load(open("/media/ml/data_ml/fma_metadata/mapping.json"))
+    CLASS_MAPPING = json.load(open("data/fma_metadata/mapping.json"))
 
-    base_path = "../audio"
-    files = sorted(list(glob(base_path + "/*.mp3")))
+    base_path = "data/test"
+    files = sorted(list(glob(base_path + "/*.*")))
 
     data = [load_audio_file(x, input_length=16000 * 120) for x in files]
 
@@ -40,10 +40,10 @@ if __name__ == "__main__":
     transformer_v2_Y = transformer_v2_Y.tolist()
 
     for path, pred in zip(files, transformer_v2_Y):
-
         print(path)
         pred_tup = [(k, pred[v]) for k, v in CLASS_MAPPING.items()]
         pred_tup.sort(key=lambda x: x[1], reverse=True)
 
         for a in pred_tup[:5]:
             print(a)
+        print()

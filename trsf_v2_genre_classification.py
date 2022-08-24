@@ -3,6 +3,9 @@ from glob import glob
 import os
 
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
+for CUDA in tf.config.experimental.list_physical_devices('GPU'):
+    tf.config.experimental.set_memory_growth(CUDA, True)
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
 from models import transformer_classifier
