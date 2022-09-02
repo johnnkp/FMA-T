@@ -57,7 +57,10 @@ def transformer_classifier(
         shifted_input_layers = tf.keras.layers.Concatenate()
         shifted_input_ids = shifted_input_layers([start_tokens, input_ids[:, :-1]])
         ValueError: A `Concatenate` layer requires inputs with matching shapes except for the concatenation axis.
-        Received: input_shape=[(None, 1), (None, None, 128)] """
+        Received: input_shape=[(None, 1), (None, None, 128)]
+        
+        AdapterBERT/modeling.py: output = tf.gather(embedding_table, flat_input_ids)
+        Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64 """
 
     encoder = Encoder(
         num_layers=num_layers,
