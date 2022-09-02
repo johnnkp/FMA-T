@@ -61,6 +61,7 @@ def transformer_classifier(
         
         AdapterBERT/modeling.py: output = tf.gather(embedding_table, flat_input_ids)
         BigBird/core/utils.py: output = tf.nn.embedding_lookup(params=self.word_embeddings, ids=input_ids)
+        TFBlenderbot*Model.modeling_tf_utils.py: return tf.gather(self.weight, input_ids)
         Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64 """
 
     encoder = Encoder(
