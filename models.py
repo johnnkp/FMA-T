@@ -47,6 +47,18 @@ def transformer_classifier(
 ):
     inp = Input((None, d_model))
 
+    """ modeling_tf_bart.py: shifted_input_ids = tf.concat([start_tokens, input_ids[:, :-1]], -1)
+        ValueError: Shape must be rank 2 but is rank 3
+        for '{{node tf_bart_model/model/concat}} = ConcatV2[N=2, T=DT_FLOAT, Tidx=DT_INT32]
+        (tf_bart_model/model/Fill, tf_bart_model/model/strided_slice_2, tf_bart_model/model/concat/axis)'
+         with input shapes: [?,1], [?,?,128], [].
+         
+        modeling_tf_bart.py:
+        shifted_input_layers = tf.keras.layers.Concatenate()
+        shifted_input_ids = shifted_input_layers([start_tokens, input_ids[:, :-1]])
+        ValueError: A `Concatenate` layer requires inputs with matching shapes except for the concatenation axis.
+        Received: input_shape=[(None, 1), (None, None, 128)] """
+
     encoder = Encoder(
         num_layers=num_layers,
         d_model=d_model,
