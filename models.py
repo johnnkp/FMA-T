@@ -14,7 +14,7 @@ from tensorflow.python.keras import backend as K
 from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import math_ops
 
-from transformer import Encoder
+from transformer import Encoder, Decoder
 
 
 def custom_binary_accuracy(y_true, y_pred, threshold=0.5):
@@ -156,6 +156,41 @@ def rnn_classifier(
 
     return model
 
+def transformer_decoder(
+        num_layers=4,
+        d_model=128,
+        num_heads=8,
+        dff=256,
+        maximum_position_encoding=2048,
+        n_classes=16,
+):
+    inp = Input((None, d_model))
+
+    decoder = Decoder(
+        num_layers=num_layers,
+        d_model=d_model,
+        num_heads=num_heads,
+        dff=dff,
+        maximum_position_encoding=maximum_position_encoding,
+    )
+
+    x = decoder(inp, inp)
+
+    x = GlobalAvgPool1D()(x)
+
+    x = Dense(4 * n_classes, activation="selu")(x)
+
+    x = Dropout(0.1)(x)
+
+    out = Dense(n_classes, activation="sigmoid")(x)
+
+    model = Model(inputs=inp, outputs=out)
+
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+    model.summary()
+
+    return model
 
 if __name__ == "__main__":
     model1 = transformer_classifier()
