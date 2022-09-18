@@ -136,6 +136,31 @@ def point_wise_feed_forward_network(d_model, dff):
         ]
     )
 
+# https://github.com/hmohebbi/TF-Adapter-BERT/blob/master/modeling_tf_adapter_bert.py
+class AdapterModule(tf.keras.layers.Layer):
+    def __init__(self, input_size=768, bottleneck_size=64, non_linearity=gelu, *inputs, **kwargs):
+        super(AdapterModule, self).__init__(name="AdapterModule")
+
+        self.non_linearity = non_linearity
+
+        self.down_project = tf.keras.layers.Dense(
+            bottleneck_size,
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=1e-3),
+            bias_initializer="zeros",
+            name="feedforward_downproject")
+
+        self.up_project = tf.keras.layers.Dense(
+            input_size,
+            kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=1e-3),
+            bias_initializer="zeros",
+            name="feedforward_upproject")
+
+    def call(self, inputs, **kwargs):
+        output = self.down_project(inputs)
+        output = self.non_linearity(output)
+        output = self.up_project(output)
+        output = output + inputs
+        return output
 
 class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads, dff, rate=0.1):
@@ -150,9 +175,12 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
+        self.adapter = AdapterModule(input_size=d_model)
+
     def call(self, x, training=None, mask=None):
         attn_output, _ = self.mha(x, x, x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
+        attn_output = self.adapter(attn_output)
         out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model)
 
         ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
