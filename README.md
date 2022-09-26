@@ -1,7 +1,7 @@
-# music_genre_classification
-music genre classification : GRU vs Transformer
+# Transformer-based Music Genre Classification
+Music genre classification : AdapterBERT vs Transformer
 
-Code for: https://towardsdatascience.com/music-genre-classification-transformers-vs-recurrent-neural-networks-631751a71c58
+Code from: https://towardsdatascience.com/music-genre-classification-transformers-vs-recurrent-neural-networks-631751a71c58
 
 ### Data:
 
@@ -18,9 +18,8 @@ python -m pip install -r requirements.txt
 * Uncompress the data zips (fma_metadata.zip, fma_large.zip).
 * Run [prepare_data.py](code/prepare_data.py) with the correct paths to genrate mapping files.
 * Run [audio_processing.py](code/audio_processing.py) with the correct paths to genrate .npy files.
-* Run training with [rnn_genre_classification.py](code/rnn_genre_classification.py) or [trsf_genre_classification.py](code/trsf_genre_classification.py)
-
-* To predict on new mp3s run [predict.py](code/predict.py) with the correct paths.
+* Run training with [trsf_pretrain.py](trsf_pretrain.py) then [transformer_decoder_output.py](transformer_decoder_output.py)
+* To predict on new mp3s run [transformer_predict.py](transformer_predict.py) with the correct paths.
 
 ### Description
 The objective of this post is to implement a music genre classification model by
