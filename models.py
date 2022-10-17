@@ -58,9 +58,13 @@ def transformer_classifier(
         shifted_input_ids = shifted_input_layers([start_tokens, input_ids[:, :-1]])
         ValueError: A `Concatenate` layer requires inputs with matching shapes except for the concatenation axis.
         Received: input_shape=[(None, 1), (None, None, 128)]
+                
+        BigBird/core/attention.py: first_product = tf.einsum("BHQD,BHKD->BHQK", blocked_query_matrix[:, :, 0], key_layer)
+        ValueError: Dimensions must be equal, but are 64 and 1024 for
+        '{{node bert/encoder/layer_0/self/einsum_1/Einsum}} = Einsum[N=2, T=DT_FLOAT, equation="BHQD,BHKD->BHQK"]
+        (bert/encoder/layer_0/self/strided_slice_3, bert/encoder/layer_0/self/dense_1/BiasAdd)'
+        with input shapes: [?,12,16,64], [?,?,128,?].
         
-        AdapterBERT/modeling.py: output = tf.gather(embedding_table, flat_input_ids)
-        BigBird/core/utils.py: output = tf.nn.embedding_lookup(params=self.word_embeddings, ids=input_ids)
         TFBlenderbot*Model.modeling_tf_utils.py: return tf.gather(self.weight, input_ids)
         Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64 """
 
