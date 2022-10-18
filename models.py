@@ -66,7 +66,10 @@ def transformer_classifier(
         with input shapes: [?,12,16,64], [?,?,128,?].
         
         TFBlenderbot*Model.modeling_tf_utils.py: return tf.gather(self.weight, input_ids)
-        Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64 """
+        Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64
+        
+        modeling_tf_roberta.py: batch_size, seq_length = input_shape
+        ValueError: too many values to unpack (expected 2) """
 
     encoder = Encoder(
         num_layers=num_layers,
