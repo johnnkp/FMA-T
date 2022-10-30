@@ -1,3 +1,4 @@
+# https://github.com/CVxTz/music_genre_classification/blob/master/code/models.py
 from tensorflow.keras.layers import (
     Bidirectional,
     Dense,
@@ -36,7 +37,7 @@ def custom_binary_crossentropy(y_true, y_pred):
     bce += (1 - y_true) * math_ops.log(1 - output + K.epsilon())
     return K.sum(-bce, axis=-1)
 
-
+# MHW2202: Y. Mansar model adjustment
 def transformer_classifier(
     num_layers=4,
     d_model=128,
@@ -60,7 +61,7 @@ def transformer_classifier(
         Received: input_shape=[(None, 1), (None, None, 128)]
                 
         BigBird/core/attention.py: first_product = tf.einsum("BHQD,BHKD->BHQK", blocked_query_matrix[:, :, 0], key_layer)
-        ValueError: Dimensions must be equal, but are 64 and 1024 for
+        ValueError: Dimensions must be equal, but are 64 and ? for
         '{{node bert/encoder/layer_0/self/einsum_1/Einsum}} = Einsum[N=2, T=DT_FLOAT, equation="BHQD,BHKD->BHQK"]
         (bert/encoder/layer_0/self/strided_slice_3, bert/encoder/layer_0/self/dense_1/BiasAdd)'
         with input shapes: [?,12,16,64], [?,?,128,?].
@@ -163,6 +164,7 @@ def rnn_classifier(
 
     return model
 
+# MHW2202: transformer decoder model
 def transformer_decoder(
         num_layers=4,
         d_model=128,

@@ -1,3 +1,5 @@
+# MHW2202: transformer training code
+# modified from https://github.com/CVxTz/music_genre_classification/blob/master/code/trsf_v2_genre_classification.py
 import json
 import os
 from collections import Counter
