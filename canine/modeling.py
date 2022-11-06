@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# https://github.com/google-research/language/blob/master/language/canine/modeling.py
 """The main CANINE model and related functions."""
 
 from typing import Optional, Sequence, Text
@@ -21,7 +22,7 @@ from language.canine import bert_modeling
 from language.canine import config_utils
 from language.canine import local_attention
 from language.canine import tensor_contracts as tc
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 # Support up to 16 hash functions.
 _PRIMES = [
@@ -77,8 +78,8 @@ class CanineModel:
   def __init__(self,
                config: CanineModelConfig,
                atom_input_ids: tf.Tensor,
-               atom_input_mask: tf.Tensor,
-               atom_segment_ids: tf.Tensor,
+               atom_input_mask: tf.Tensor = None,
+               atom_segment_ids: tf.Tensor = None,
                is_training: bool,
                final_seq_char_positions: Optional[tf.Tensor] = None):
     """Creates a `CanineModel`.
@@ -111,25 +112,25 @@ class CanineModel:
     """
 
     self.config: CanineModelConfig = config
-    self._is_training: bool = is_training
-
-    if final_seq_char_positions is not None:
-      batch_size, predictions_len = bert_modeling.get_shape_list(
-          final_seq_char_positions)
-      self._final_char_seq_length: tf.Tensor = predictions_len
-    else:
-      batch_size, char_seq_length = bert_modeling.get_shape_list(atom_input_ids)
-      self._final_char_seq_length: tf.Tensor = char_seq_length
-    self._batch_size = batch_size
-
     config.validate()
 
+    self._is_training: bool = is_training
     if not is_training:
       config.hidden_dropout_prob = 0.0
       config.attention_probs_dropout_prob = 0.0
 
-    batch_size, char_seq_length = bert_modeling.get_shape_list(atom_input_ids)
-    del batch_size  # Unused.
+    """ if final_seq_char_positions is not None:
+      batch_size, predictions_len = bert_modeling.get_shape_list(
+          final_seq_char_positions)
+      self._final_char_seq_length: tf.Tensor = predictions_len
+    else:
+      batch_size, char_seq_length = bert_modeling.get_shape_list(atom_input_ids) """
+    batch_size, char_seq_length, _ = bert_modeling.get_shape_list(atom_input_ids)
+    self._final_char_seq_length: tf.Tensor = char_seq_length
+    self._batch_size = batch_size
+
+    """ batch_size, char_seq_length = bert_modeling.get_shape_list(atom_input_ids)
+    del batch_size  # Unused. """
 
     # `molecule_seq_length`: scalar int.
     molecule_seq_length = char_seq_length // config.downsampling_rate
