@@ -15,6 +15,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.activations import gelu
 
+
 def get_angles(pos, i, d_model):
     angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
     return pos * angle_rates
@@ -136,6 +137,7 @@ def point_wise_feed_forward_network(d_model, dff):
         ]
     )
 
+
 # https://github.com/hmohebbi/TF-Adapter-BERT/blob/master/modeling_tf_adapter_bert.py
 class AdapterModule(tf.keras.layers.Layer):
     def __init__(self, input_size=768, bottleneck_size=64, non_linearity=gelu, *inputs, **kwargs):
@@ -146,14 +148,14 @@ class AdapterModule(tf.keras.layers.Layer):
         self.down_project = tf.keras.layers.Dense(
             bottleneck_size,
             kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=1e-3),
-            bias_initializer="zeros",)
-            # name="feedforward_downproject")
+            bias_initializer="zeros", )
+        # name="feedforward_downproject")
 
         self.up_project = tf.keras.layers.Dense(
             input_size,
             kernel_initializer=tf.keras.initializers.TruncatedNormal(stddev=1e-3),
-            bias_initializer="zeros",)
-            # name="feedforward_upproject")
+            bias_initializer="zeros", )
+        # name="feedforward_upproject")
 
     def call(self, inputs, **kwargs):
         output = self.down_project(inputs)
@@ -162,8 +164,9 @@ class AdapterModule(tf.keras.layers.Layer):
         output = output + inputs
         return output
 
+
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, rate=0.1):
+    def __init__(self, d_model, num_heads, dff, rate=0.1, adapter=False):
         super(EncoderLayer, self).__init__()
 
         self.mha = MultiHeadAttention(d_model, num_heads)
@@ -175,28 +178,30 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
-        self.adapter1 = AdapterModule(input_size=d_model)
-        self.adapter2 = AdapterModule(input_size=d_model)
+        if adapter:
+            self.adapter1 = AdapterModule(input_size=d_model)
+            self.adapter2 = AdapterModule(input_size=d_model)
+        self.adapter = adapter
 
     def call(self, x, training=None, mask=None):
         attn_output, _ = self.mha(x, x, x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
-        attn_output = self.adapter1(attn_output)
+        if self.adapter:
+            attn_output = self.adapter1(attn_output)
         out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model)
 
         ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
         ffn_output = self.dropout2(ffn_output, training=training)
-        ffn_output = self.adapter2(ffn_output)
-        out2 = self.layernorm2(
-            out1 + ffn_output
-        )  # (batch_size, input_seq_len, d_model)
+        if self.adapter:
+            ffn_output = self.adapter2(ffn_output)
+        out2 = self.layernorm2(out1 + ffn_output)  # (batch_size, input_seq_len, d_model)
 
         return out2
 
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(
-        self, num_layers, d_model, num_heads, dff, maximum_position_encoding, rate=0.1,
+            self, num_layers, d_model, num_heads, dff, maximum_position_encoding, rate=0.1, adapter=False
     ):
         super(Encoder, self).__init__()
 
@@ -206,7 +211,7 @@ class Encoder(tf.keras.layers.Layer):
         self.pos_encoding = positional_encoding(maximum_position_encoding, self.d_model)
 
         self.enc_layers = [
-            EncoderLayer(d_model, num_heads, dff, rate) for _ in range(num_layers)
+            EncoderLayer(d_model, num_heads, dff, rate, adapter) for _ in range(num_layers)
         ]
 
         self.dropout = tf.keras.layers.Dropout(rate)
@@ -248,8 +253,9 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
             "name": self.name,
         }
 
+
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, rate=0.1):
+    def __init__(self, d_model, num_heads, dff, rate=0.1, adapter=False):
         super(DecoderLayer, self).__init__()
 
         self.mha1 = MultiHeadAttention(d_model, num_heads)
@@ -265,9 +271,11 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.dropout2 = tf.keras.layers.Dropout(rate)
         self.dropout3 = tf.keras.layers.Dropout(rate)
 
-        self.adapter1 = AdapterModule(input_size=d_model)
-        self.adapter2 = AdapterModule(input_size=d_model)
-        self.adapter3 = AdapterModule(input_size=d_model)
+        if adapter:
+            self.adapter1 = AdapterModule(input_size=d_model)
+            self.adapter2 = AdapterModule(input_size=d_model)
+            self.adapter3 = AdapterModule(input_size=d_model)
+        self.adapter = adapter
 
     def call(self, x, enc_output, training=None,
              look_ahead_mask=None, padding_mask=None):
@@ -275,18 +283,22 @@ class DecoderLayer(tf.keras.layers.Layer):
 
         attn1, attn_weights_block1 = self.mha1(x, x, x, look_ahead_mask)  # (batch_size, target_seq_len, d_model)
         attn1 = self.dropout1(attn1, training=training)
-        attn1 = self.adapter1(attn1)
+        if self.adapter:
+            attn1 = self.adapter1(attn1)
         out1 = self.layernorm1(attn1 + x)
 
         attn2, attn_weights_block2 = self.mha2(
             enc_output, enc_output, out1, padding_mask)  # (batch_size, target_seq_len, d_model)
         attn2 = self.dropout2(attn2, training=training)
-        attn2 = self.adapter2(attn2)
+        if self.adapter:
+            attn2 = self.adapter2(attn2)
         out2 = self.layernorm2(attn2 + out1)  # (batch_size, target_seq_len, d_model)
 
         ffn_output = self.ffn(out2)  # (batch_size, target_seq_len, d_model)
         ffn_output = self.dropout3(ffn_output, training=training)
-        ffn_output = self.adapter3(ffn_output)
+        if self.adapter:
+            ffn_output = self.adapter3(ffn_output)
+
         out3 = self.layernorm3(ffn_output + out2)  # (batch_size, target_seq_len, d_model)
 
         return out3, attn_weights_block1, attn_weights_block2
@@ -294,7 +306,7 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,  # target_vocab_size,
-                 maximum_position_encoding, rate=0.1):
+                 maximum_position_encoding, rate=0.1, adapter=False):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
@@ -303,7 +315,7 @@ class Decoder(tf.keras.layers.Layer):
         # self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(maximum_position_encoding, d_model)
 
-        self.dec_layers = [DecoderLayer(d_model, num_heads, dff, rate)
+        self.dec_layers = [DecoderLayer(d_model, num_heads, dff, rate, adapter)
                            for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
