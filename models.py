@@ -67,13 +67,11 @@ def transformer_classifier(
         with input shapes: [?,12,16,64], [?,?,128,?].
         
         TFBlenderbot*Model.modeling_tf_utils.py: return tf.gather(self.weight, input_ids)
+        modeling_tf_roberta.py: inputs_embeds = tf.gather(params=self.weight, indices=input_ids)
         Value passed to parameter 'indices' has DataType float32 not in list of allowed values: int32, int64
         
         canine\local_attention.py: input_shape = bert_modeling.get_shape_list(input_tensor, expected_rank=3)
-        AttributeError: 'NoneType' object has no attribute 'shape'
-        
-        modeling_tf_roberta.py: batch_size, seq_length = input_shape
-        ValueError: too many values to unpack (expected 2) """
+        AttributeError: 'NoneType' object has no attribute 'shape' """
 
     encoder = Encoder(
         num_layers=num_layers,
