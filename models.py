@@ -106,7 +106,7 @@ def transformer_classifier(
 
 # MHW2202: transformer pretrain adjustment 
 def transformer_pretrain(
-    num_layers=4, d_model=128, num_heads=8, dff=256, maximum_position_encoding=2048,
+    num_layers=4, d_model=128, num_heads=8, dff=512, maximum_position_encoding=16384,
 ):
     inp = Input((None, d_model))
 
@@ -116,7 +116,6 @@ def transformer_pretrain(
         num_heads=num_heads,
         dff=dff,
         maximum_position_encoding=maximum_position_encoding,
-        rate=0.2, # 0.3,
     )
 
     x = encoder(inp)
@@ -170,8 +169,8 @@ def transformer_decoder(
         num_layers=4,
         d_model=128,
         num_heads=8,
-        dff=256,
-        maximum_position_encoding=2048,
+        dff=512,
+        maximum_position_encoding=16384,
         n_classes=16,
 ):
     inp = Input((None, d_model))
@@ -182,7 +181,6 @@ def transformer_decoder(
         num_heads=num_heads,
         dff=dff,
         maximum_position_encoding=maximum_position_encoding,
-        rate=0.2,
     )
 
     x = decoder(inp, inp)
