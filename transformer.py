@@ -178,9 +178,10 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
+        # MHW2202: AdapterBERT adjustment
         if adapter:
-            self.adapter1 = AdapterModule(input_size=d_model)
-            self.adapter2 = AdapterModule(input_size=d_model)
+            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
+            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
         self.adapter = adapter
 
     def call(self, x, training=None, mask=None):
@@ -271,10 +272,11 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.dropout2 = tf.keras.layers.Dropout(rate)
         self.dropout3 = tf.keras.layers.Dropout(rate)
 
+        # MHW2202: AdapterBERT adjustment
         if adapter:
-            self.adapter1 = AdapterModule(input_size=d_model)
-            self.adapter2 = AdapterModule(input_size=d_model)
-            self.adapter3 = AdapterModule(input_size=d_model)
+            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
+            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
+            self.adapter3 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
         self.adapter = adapter
 
     def call(self, x, enc_output, training=None,
