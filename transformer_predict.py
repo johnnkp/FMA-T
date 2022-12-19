@@ -1,5 +1,6 @@
 # MHW2202: prediction code
 # modified from https://github.com/CVxTz/music_genre_classification/blob/master/code/predict.py
+import datetime
 import json
 from glob import glob
 
@@ -14,7 +15,13 @@ CLASS_MAPPING = json.load(open("data/fma_metadata/mapping.json"))
 
 files = sorted(list(glob("data/test/*.*")))
 
-data = [load_audio_file(x, input_length=16000 * 120) for x in files]
+data = []
+
+for x in files:
+    try:
+        data.append(load_audio_file(x, input_length=16000 * 120))
+    except:
+        print(x)
 
 transformer_model = transformer_decoder(n_classes=len(CLASS_MAPPING))
 
@@ -31,6 +38,8 @@ for _ in range(repeats):
     transformer_v2_Y += transformer_model.predict(X) / repeats
 
 transformer_v2_Y = transformer_v2_Y.tolist()
+
+print(datetime.datetime.now())
 
 for path, pred in zip(files, transformer_v2_Y):
     print(path)
