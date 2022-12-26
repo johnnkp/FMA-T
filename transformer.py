@@ -15,6 +15,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.activations import gelu
 
+from KerasTransformer import GlobalSelfAttention, CausalSelfAttention, CrossAttention, FeedForward
 
 def get_angles(pos, i, d_model):
     angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
@@ -166,39 +167,31 @@ class AdapterModule(tf.keras.layers.Layer):
 
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, rate=0.1, adapter=False):
-        super(EncoderLayer, self).__init__()
+    def __init__(self, d_model, num_heads, dff, dropout_rate=0.1, adapter=False):
+        super().__init__()
 
-        self.mha = MultiHeadAttention(d_model, num_heads)
-        self.ffn = point_wise_feed_forward_network(d_model, dff)
+        self.self_attention = GlobalSelfAttention(
+            num_heads=num_heads,
+            key_dim=d_model,
+            dropout=dropout_rate)
 
-        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ffn = FeedForward(d_model, dff)
 
-        self.dropout1 = tf.keras.layers.Dropout(rate)
-        self.dropout2 = tf.keras.layers.Dropout(rate)
-
-        # MHW2202: AdapterBERT adjustment
         if adapter:
-            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
-            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
+            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model / 2)
+            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model / 2)
         self.adapter = adapter
 
-    def call(self, x, training=None, mask=None):
-        attn_output, _ = self.mha(x, x, x, mask)  # (batch_size, input_seq_len, d_model)
-        attn_output = self.dropout1(attn_output, training=training)
+    def call(self, x):
+        x = self.self_attention(x)
         if self.adapter:
-            attn_output = self.adapter1(attn_output)
-        out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model)
+            x = self.adapter1(x)
 
-        ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
-        ffn_output = self.dropout2(ffn_output, training=training)
+        x = self.ffn(x)
         if self.adapter:
-            ffn_output = self.adapter2(ffn_output)
-        out2 = self.layernorm2(out1 + ffn_output)  # (batch_size, input_seq_len, d_model)
+            x = self.adapter2(x)
 
-        return out2
-
+        return x
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(
