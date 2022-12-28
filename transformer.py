@@ -17,6 +17,7 @@ from tensorflow.keras.activations import gelu
 
 from KerasTransformer import GlobalSelfAttention, CausalSelfAttention, CrossAttention, FeedForward
 
+
 def get_angles(pos, i, d_model):
     angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
     return pos * angle_rates
@@ -175,23 +176,13 @@ class EncoderLayer(tf.keras.layers.Layer):
             key_dim=d_model,
             dropout=dropout_rate)
 
-        self.ffn = FeedForward(d_model, dff)
-
-        if adapter:
-            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model / 2)
-            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model / 2)
-        self.adapter = adapter
+        self.ffn = FeedForward(d_model, dff, dropout_rate, adapter)
 
     def call(self, x):
         x = self.self_attention(x)
-        if self.adapter:
-            x = self.adapter1(x)
-
         x = self.ffn(x)
-        if self.adapter:
-            x = self.adapter2(x)
-
         return x
+
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(
@@ -219,7 +210,7 @@ class Encoder(tf.keras.layers.Layer):
         x = self.dropout(x, training=training)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training, mask)
+            x = self.enc_layers[i](x)  # , training, mask)
 
         return x  # (batch_size, input_seq_len, d_model)
 
@@ -249,54 +240,30 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, rate=0.1, adapter=False):
+    def __init__(self, d_model, num_heads, dff, dropout_rate=0.1, adapter=False):
         super(DecoderLayer, self).__init__()
 
-        self.mha1 = MultiHeadAttention(d_model, num_heads)
-        self.mha2 = MultiHeadAttention(d_model, num_heads)
+        self.causal_self_attention = CausalSelfAttention(
+            num_heads=num_heads,
+            key_dim=d_model,
+            dropout=dropout_rate)
 
-        self.ffn = point_wise_feed_forward_network(d_model, dff)
+        self.cross_attention = CrossAttention(
+            num_heads=num_heads,
+            key_dim=d_model,
+            dropout=dropout_rate)
 
-        self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ffn = FeedForward(d_model, dff, dropout_rate, adapter)
 
-        self.dropout1 = tf.keras.layers.Dropout(rate)
-        self.dropout2 = tf.keras.layers.Dropout(rate)
-        self.dropout3 = tf.keras.layers.Dropout(rate)
+    def call(self, x, context):
+        x = self.causal_self_attention(x=x)
+        x = self.cross_attention(x=x, context=context)
 
-        # MHW2202: AdapterBERT adjustment
-        if adapter:
-            self.adapter1 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
-            self.adapter2 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
-            self.adapter3 = AdapterModule(input_size=d_model, bottleneck_size=d_model/2)
-        self.adapter = adapter
+        # Cache the last attention scores for plotting later
+        self.last_attn_scores = self.cross_attention.last_attn_scores
 
-    def call(self, x, enc_output, training=None,
-             look_ahead_mask=None, padding_mask=None):
-        # enc_output.shape == (batch_size, input_seq_len, d_model)
-
-        attn1, attn_weights_block1 = self.mha1(x, x, x, look_ahead_mask)  # (batch_size, target_seq_len, d_model)
-        attn1 = self.dropout1(attn1, training=training)
-        if self.adapter:
-            attn1 = self.adapter1(attn1)
-        out1 = self.layernorm1(attn1 + x)
-
-        attn2, attn_weights_block2 = self.mha2(
-            enc_output, enc_output, out1, padding_mask)  # (batch_size, target_seq_len, d_model)
-        attn2 = self.dropout2(attn2, training=training)
-        if self.adapter:
-            attn2 = self.adapter2(attn2)
-        out2 = self.layernorm2(attn2 + out1)  # (batch_size, target_seq_len, d_model)
-
-        ffn_output = self.ffn(out2)  # (batch_size, target_seq_len, d_model)
-        ffn_output = self.dropout3(ffn_output, training=training)
-        if self.adapter:
-            ffn_output = self.adapter3(ffn_output)
-
-        out3 = self.layernorm3(ffn_output + out2)  # (batch_size, target_seq_len, d_model)
-
-        return out3, attn_weights_block1, attn_weights_block2
+        x = self.ffn(x)  # Shape `(batch_size, seq_len, d_model)`.
+        return x
 
 
 class Decoder(tf.keras.layers.Layer):
@@ -326,8 +293,9 @@ class Decoder(tf.keras.layers.Layer):
         x = self.dropout(x, training=training)
 
         for i in range(self.num_layers):
-            x, block1, block2 = self.dec_layers[i](x, enc_output, training,
-                                                   look_ahead_mask, padding_mask)
+            # x, block1, block2 = self.dec_layers[i](x, enc_output, training,
+            x = self.dec_layers[i](x, enc_output)  # , training,
+            # look_ahead_mask, padding_mask)
 
             # attention_weights['decoder_layer{}_block1'.format(i + 1)] = block1
             # attention_weights['decoder_layer{}_block2'.format(i + 1)] = block2
