@@ -16,7 +16,7 @@ from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import math_ops
 
 from transformer import Encoder, Decoder
-
+from KerasTransformer import CustomSchedule
 
 def custom_binary_accuracy(y_true, y_pred, threshold=0.5):
     threshold = math_ops.cast(threshold, y_pred.dtype)
@@ -116,6 +116,7 @@ def transformer_pretrain(
         num_heads=num_heads,
         dff=dff,
         maximum_position_encoding=maximum_position_encoding,
+        adapter=True,
     )
 
     x = encoder(inp)
@@ -124,9 +125,10 @@ def transformer_pretrain(
 
     model = Model(inputs=inp, outputs=out)
 
-    opt = Adam(0.0001)
+    optimizer = Adam(CustomSchedule(d_model),
+                     beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 
-    model.compile(optimizer=opt, loss=mae)
+    model.compile(optimizer=optimizer, loss=mae)
 
     model.summary()
 
@@ -181,6 +183,7 @@ def transformer_decoder(
         num_heads=num_heads,
         dff=dff,
         maximum_position_encoding=maximum_position_encoding,
+        adapter=True,
     )
 
     x = decoder(inp, inp)
@@ -195,7 +198,12 @@ def transformer_decoder(
 
     model = Model(inputs=inp, outputs=out)
 
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    optimizer = Adam(CustomSchedule(d_model),
+                     beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+
+    # categorical_crossentropy: diverge loss
+    # model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.summary()
 
