@@ -15,28 +15,27 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.activations import gelu
 
-from KerasTransformer import GlobalSelfAttention, CausalSelfAttention, CrossAttention, FeedForward
+from KerasTransformer import CausalSelfAttention, CrossAttention, FeedForward, GlobalSelfAttention, positional_encoding
+
+# def get_angles(pos, i, d_model):
+    # angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
+    # return pos * angle_rates
 
 
-def get_angles(pos, i, d_model):
-    angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
-    return pos * angle_rates
-
-
-def positional_encoding(position, d_model):
-    angle_rads = get_angles(
-        np.arange(position)[:, np.newaxis], np.arange(d_model)[np.newaxis, :], d_model
-    )
-
-    # apply sin to even indices in the array; 2i
-    angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])
-
-    # apply cos to odd indices in the array; 2i+1
-    angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
-
-    pos_encoding = angle_rads[np.newaxis, ...]
-
-    return tf.cast(pos_encoding, dtype=tf.float32)
+# def positional_encoding(position, d_model):
+#     angle_rads = get_angles(
+#         np.arange(position)[:, np.newaxis], np.arange(d_model)[np.newaxis, :], d_model
+#     )
+#
+#     # apply sin to even indices in the array; 2i
+#     angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])
+#
+#     # apply cos to odd indices in the array; 2i+1
+#     angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
+#
+#     pos_encoding = angle_rads[np.newaxis, ...]
+#
+#     return tf.cast(pos_encoding, dtype=tf.float32)
 
 
 def scaled_dot_product_attention(q, k, v, mask):
@@ -185,10 +184,9 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(
-            self, num_layers, d_model, num_heads, dff, maximum_position_encoding, rate=0.1, adapter=False
-    ):
-        super(Encoder, self).__init__()
+    def __init__(self, num_layers, d_model, num_heads,
+                 dff, maximum_position_encoding, dropout_rate=0.1, adapter=False):
+        super().__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
@@ -196,23 +194,29 @@ class Encoder(tf.keras.layers.Layer):
         self.pos_encoding = positional_encoding(maximum_position_encoding, self.d_model)
 
         self.enc_layers = [
-            EncoderLayer(d_model, num_heads, dff, rate, adapter) for _ in range(num_layers)
-        ]
+            EncoderLayer(d_model=d_model,
+                         num_heads=num_heads,
+                         dff=dff,
+                         dropout_rate=dropout_rate,
+                         adapter=adapter)
+            for _ in range(num_layers)]
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
-        self.dropout = tf.keras.layers.Dropout(rate)
+    def call(self, x):
+        # `x` is token-IDs shape: (batch, seq_len)
+        length = tf.shape(x)[1]
 
-    def call(self, x, training=None, mask=None):
-        seq_len = tf.shape(x)[1]
-
+        # This factor sets the relative scale of the embedding and positonal_encoding.
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-        x += self.pos_encoding[:, :seq_len, :]
+        x += self.pos_encoding[tf.newaxis, :length, :]
 
-        x = self.dropout(x, training=training)
+        # Add dropout.
+        x = self.dropout(x)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x)  # , training, mask)
+            x = self.enc_layers[i](x)
 
-        return x  # (batch_size, input_seq_len, d_model)
+        return x  # Shape `(batch_size, seq_len, d_model)`.
 
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
