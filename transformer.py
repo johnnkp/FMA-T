@@ -17,9 +17,10 @@ from tensorflow.keras.activations import gelu
 
 from KerasTransformer import CausalSelfAttention, CrossAttention, FeedForward, GlobalSelfAttention, positional_encoding
 
+
 # def get_angles(pos, i, d_model):
-    # angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
-    # return pos * angle_rates
+# angle_rates = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
+# return pos * angle_rates
 
 
 # def positional_encoding(position, d_model):
@@ -272,37 +273,32 @@ class DecoderLayer(tf.keras.layers.Layer):
 
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,  # target_vocab_size,
-                 maximum_position_encoding, rate=0.1, adapter=False):
+                 maximum_position_encoding, dropout_rate=0.1, adapter=False):
         super(Decoder, self).__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
 
-        # self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.pos_encoding = positional_encoding(maximum_position_encoding, d_model)
-
-        self.dec_layers = [DecoderLayer(d_model, num_heads, dff, rate, adapter)
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
+        self.dec_layers = [DecoderLayer(d_model, num_heads, dff, dropout_rate, adapter)
                            for _ in range(num_layers)]
-        self.dropout = tf.keras.layers.Dropout(rate)
+        self.last_attn_scores = None
 
-    def call(self, x, enc_output, training=None,
-             look_ahead_mask=None, padding_mask=None):
-        seq_len = tf.shape(x)[1]
-        # attention_weights = {}
+    def call(self, x, context):
+        # `x` is token-IDs shape (batch, target_seq_len)
+        length = tf.shape(x)[1]
 
-        # x = self.embedding(x)  # (batch_size, target_seq_len, d_model)
+        # This factor sets the relative scale of the embedding and positonal_encoding.
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-        x += self.pos_encoding[:, :seq_len, :]
+        x += self.pos_encoding[tf.newaxis, :length, :]
 
-        x = self.dropout(x, training=training)
+        x = self.dropout(x)
 
         for i in range(self.num_layers):
-            # x, block1, block2 = self.dec_layers[i](x, enc_output, training,
-            x = self.dec_layers[i](x, enc_output)  # , training,
-            # look_ahead_mask, padding_mask)
+            x = self.dec_layers[i](x, context)
 
-            # attention_weights['decoder_layer{}_block1'.format(i + 1)] = block1
-            # attention_weights['decoder_layer{}_block2'.format(i + 1)] = block2
+        self.last_attn_scores = self.dec_layers[-1].last_attn_scores
 
-        # x.shape == (batch_size, target_seq_len, d_model)
-        return x  # , attention_weights
+        # The shape of x is (batch_size, target_seq_len, d_model).
+        return x
